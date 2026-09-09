@@ -328,6 +328,19 @@ export type Service = {
   active: boolean;
 };
 
+export type BookingItem = {
+  id: string;
+  service_id: string | null;
+  service_name: string;
+  category_name: string | null;
+  unit_price: string | number;
+  quantity: number;
+  duration_minutes: number;
+  line_total: string | number;
+  status: string;
+  payment_status: string;
+};
+
 export type Booking = {
   id: string;
   booking_reference: string | null;
@@ -348,6 +361,8 @@ export type Booking = {
   payment_provider: string | null;
   paid_at: string | null;
   created_at: string;
+  stripe_payment_intent_id?: string | null;
+  items?: BookingItem[];
 };
 
 export type BookingStats = {
@@ -424,7 +439,8 @@ export const bookingPublicApi = {
   catalog: () =>
     request<{ categories: PublicCategory[]; services: PublicService[] }>("/api/services"),
   create: (body: {
-    service_id: string;
+    service_id?: string;
+    items?: Array<{ service_id: string; quantity: number }>;
     full_name: string;
     email: string;
     phone: string;
@@ -437,7 +453,8 @@ export const bookingPublicApi = {
       body: JSON.stringify(body),
     }),
   startCheckout: (body: {
-    service_id: string;
+    service_id?: string;
+    items?: Array<{ service_id: string; quantity: number }>;
     full_name: string;
     email: string;
     phone: string;
@@ -487,4 +504,6 @@ export type PublicBooking = {
   status: string;
   payment_status: string;
   payment_method: string | null;
+  stripe_payment_intent_id?: string | null;
+  items?: BookingItem[];
 };
