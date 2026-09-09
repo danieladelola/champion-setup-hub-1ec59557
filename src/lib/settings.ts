@@ -150,7 +150,13 @@ export const settingsSchema = z.object({
       disabled_message: text(300).default("Online booking is temporarily closed. Please call us to arrange your appointment."),
       open_time: time.default("11:00"),
       close_time: time.default("18:00"),
+      // Which weekdays accept bookings. Index 0 = Sunday … 6 = Saturday.
+      open_days: z
+        .array(z.boolean())
+        .length(7)
+        .default([false, true, true, true, true, true, true]),
       slot_interval_minutes: z.coerce.number().int().min(5).max(120).default(10),
+
       min_notice_hours: z.coerce.number().int().min(0).max(720).default(0),
       max_advance_days: z.coerce.number().int().min(1).max(730).default(180),
       require_payment: z.boolean().default(false),
