@@ -26,6 +26,7 @@ import bookingHeroAsset from "@/assets/booking-hero-lashes.webp";
 import { bookingPublicApi } from "@/lib/admin-api";
 import { AdSlot } from "@/components/ad-slot";
 import { buildTimeSlots } from "@/lib/availability";
+import { closedWeekdays } from "@/lib/settings";
 import { useSettings } from "@/lib/site-settings";
 
 const title = "Book A Service — Mayor Beauty Place";
@@ -210,6 +211,12 @@ function Book() {
   const takenSlots = useMemo(
     () => new Set(dayAvailability?.unavailable ?? []),
     [dayAvailability],
+  );
+
+  // Weekdays the salon has switched off in admin Settings.
+  const closedDays = useMemo(
+    () => monthAvailability?.closed_weekdays ?? closedWeekdays(booking.open_days),
+    [monthAvailability, booking.open_days],
   );
 
   const fullyBookedDates = useMemo(
@@ -452,6 +459,7 @@ function Book() {
                         disabled={[
                           { before: today },
                           { after: lastBookableDay },
+                          ...(closedDays.length ? [{ dayOfWeek: closedDays }] : []),
                           ...fullyBookedDates,
                         ]}
                         defaultMonth={selectedDate ?? today}
