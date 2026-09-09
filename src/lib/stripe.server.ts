@@ -166,14 +166,14 @@ export async function createBookingCheckoutSession(params: {
   bookingId: string;
   reference: string;
   email: string;
-  serviceName: string;
-  price: number;
+  /** One line per selected service — the customer pays for them together. */
+  lines: CheckoutLine[];
   origin: string;
 }) {
   return await createSession({
     email: params.email,
     reference: params.reference,
-    lines: [{ name: params.serviceName, unit_price: params.price, quantity: 1 }],
+    lines: params.lines,
     metadata: {
       kind: "booking",
       booking_id: params.bookingId,

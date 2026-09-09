@@ -12,12 +12,29 @@ export const Route = createFileRoute("/api/admin/bookings")({
           if (!admin) return json({ error: "Unauthorized" }, { status: 401 });
           const sql = getDb();
           const bookings = await sql`
-            select id, booking_reference, full_name, email, phone, service, category_name,
-                   price, currency, duration_minutes, preferred_date, preferred_time, notes,
-                   status, coalesce(payment_status, 'unpaid') as payment_status,
-                   payment_method, payment_provider, paid_at, created_at
-            from bookings
-            order by created_at desc
+            select b.id, b.booking_reference, b.full_name, b.email, b.phone, b.service,
+                   b.category_name, b.price, b.currency, b.duration_minutes,
+                   b.preferred_date, b.preferred_time, b.notes, b.status,
+                   coalesce(b.payment_status, 'unpaid') as payment_status,
+                   b.payment_method, b.payment_provider, b.stripe_payment_intent_id,
+                   b.stripe_session_id, b.paid_at, b.created_at,
+                   coalesce(
+                     (select json_agg(json_build_object(
+                        'id', i.id,
+                        'service_id', i.service_id,
+                        'service_name', i.service_name,
+                        'category_name', i.category_name,
+                        'unit_price', i.unit_price,
+                        'quantity', i.quantity,
+                        'duration_minutes', i.duration_minutes,
+                        'line_total', i.line_total,
+                        'status', i.status,
+                        'payment_status', i.payment_status
+                      ) order by i.created_at)
+                      from booking_items i where i.booking_id = b.id),
+                     '[]'::json) as items
+            from bookings b
+            order by b.created_at desc
             limit 500`;
 
           const statsRows = await sql`
