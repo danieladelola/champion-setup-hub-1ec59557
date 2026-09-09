@@ -185,18 +185,21 @@ export async function markBookingPaid(params: {
 /** Cancels a booking whose Stripe session expired or failed without payment. */
 export async function expireBooking(sessionId: string) {
   const sql = getDb();
+  // The appointment itself is kept — only the payment is marked as failed, so
+  // the salon still sees it under Pending Payment and can take money in person.
   const rows = await sql`
     update bookings
-    set status = 'cancelled', updated_at = now()
-    where stripe_session_id = ${sessionId} and payment_status = 'unpaid'
+    set payment_status = 'failed', updated_at = now()
+    where stripe_session_id = ${sessionId} and payment_status <> 'paid'
     returning id`;
   const booking = rows[0];
   if (booking) {
     await sql`
-      update booking_items set status = 'cancelled'
+      update booking_items set payment_status = 'failed'
       where booking_id = ${booking["id"] as string}`;
   }
 }
+
 
 export async function getBookingItems(bookingId: string) {
   const sql = getDb();
