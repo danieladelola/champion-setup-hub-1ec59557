@@ -15,7 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CURRENCIES,
   DEFAULT_SETTINGS,
+  normaliseOpenDays,
   TIMEZONES,
+  WEEKDAYS,
   type SiteSettings,
 } from "@/lib/settings";
 
