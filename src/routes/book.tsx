@@ -749,11 +749,6 @@ function Book() {
                         <span className="text-sm">
                           {line.service.name}
                           {line.quantity > 1 ? ` × ${line.quantity}` : ""}
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {line.service.category_id === selectedCategory?.id
-                              ? selectedCategory?.name
-                              : ""}
-                          </span>
                         </span>
                         <span className="font-medium">
                           {formatPrice(Number(line.service.price) * line.quantity)}

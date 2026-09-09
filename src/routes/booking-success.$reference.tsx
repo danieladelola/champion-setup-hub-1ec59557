@@ -79,11 +79,37 @@ function BookingSuccess() {
                 : "Pay-later methods can take a moment to settle. This page updates automatically once Stripe confirms the payment."}
             </p>
 
+            {booking.items && booking.items.length > 0 ? (
+              <div className="mt-8 rounded-3xl border border-border bg-card p-6">
+                <p className="text-[10px] tracking-widest text-muted-foreground uppercase">
+                  Services in this booking
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {booking.items.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-4 text-sm">
+                      <span>
+                        {item.service_name}
+                        {item.quantity > 1 ? ` × ${item.quantity}` : ""}
+                      </span>
+                      <span className="font-semibold">
+                        £{Number(item.line_total).toFixed(2)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-sm">
+                  <span className="font-medium">Total</span>
+                  <span className="font-display text-xl">
+                    £{Number(booking.price).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-8 grid gap-4 rounded-3xl border border-border bg-card p-6 sm:grid-cols-2">
               <Detail label="Booking Reference" value={booking.booking_reference} />
               <Detail label="Name" value={booking.full_name ?? "—"} />
-              <Detail label="Service" value={booking.service ?? "—"} />
-              <Detail label="Category" value={booking.category_name ?? "—"} />
+              <Detail label="Services" value={booking.service ?? "—"} />
               <Detail
                 label="Date & Time"
                 value={`${booking.preferred_date ?? "—"} · ${booking.preferred_time ?? "—"}`}
