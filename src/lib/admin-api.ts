@@ -330,19 +330,35 @@ export type Service = {
 
 export type Booking = {
   id: string;
+  booking_reference: string | null;
   full_name: string | null;
   email: string | null;
   phone: string | null;
   service: string | null;
   category_name: string | null;
   price: string;
+  currency?: string | null;
   duration_minutes: number;
   preferred_date: string | null;
   preferred_time: string | null;
   notes: string | null;
   status: string;
+  payment_status: string;
+  payment_method: string | null;
+  payment_provider: string | null;
+  paid_at: string | null;
   created_at: string;
 };
+
+export type BookingStats = {
+  total: number;
+  paid: number;
+  pending_payment: number;
+  completed: number;
+  cancelled: number;
+  revenue: string;
+};
+
 
 export const bookingApi = {
   categories: () =>
