@@ -277,8 +277,8 @@ function Book() {
           className="absolute inset-0 h-full w-full object-cover"
           loading="eager"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/70 to-ink/40" />
-        <div className="relative z-10 mx-auto max-w-6xl">
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/85 via-ink/70 to-ink/85" />
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center text-center">
           <span className="mb-6 inline-flex items-center gap-3 rounded-full border border-on-dark/25 bg-on-dark/10 px-5 py-2 text-xs font-medium tracking-widest text-on-dark/90 uppercase backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-red" />
             Book A Service
@@ -287,7 +287,7 @@ function Book() {
             Reserve Your
             <em className="italic text-brand-red"> Session</em>
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed font-light text-on-dark/90">
+          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed font-light text-on-dark/90">
             Follow the steps below to choose your treatment, time, and details.
           </p>
         </div>

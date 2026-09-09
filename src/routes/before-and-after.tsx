@@ -48,7 +48,7 @@ function BeforeAfter() {
           <div className="absolute inset-0 bg-gradient-to-b from-ink/80 via-ink/70 to-ink/85" />
         </div>
         <div className="relative px-6 pt-44 pb-28 text-on-dark md:px-12 md:pt-56 md:pb-36">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto flex max-w-6xl flex-col items-center text-center">
             <span className="mb-6 inline-flex items-center gap-3 rounded-full border border-on-dark/25 bg-on-dark/10 px-5 py-2 text-xs font-medium tracking-widest text-on-dark/90 uppercase">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-red" />
               Gallery
@@ -56,7 +56,7 @@ function BeforeAfter() {
             <h1 className="max-w-3xl font-display text-6xl leading-[1.02] md:text-8xl">
               Before & <em className="italic text-brand-red">After</em>
             </h1>
-            <p className="mt-8 max-w-xl text-base leading-relaxed font-light text-on-dark/75">
+            <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed font-light text-on-dark/75">
               Real clients, real results. Browse a selection of transformations
               created at Mayor Beauty Place — every look built on professional
               ethics and quality products.
