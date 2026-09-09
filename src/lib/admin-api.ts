@@ -393,12 +393,14 @@ export const bookingApi = {
     }),
   deleteService: (id: string) =>
     request<{ ok: true }>(`/api/admin/services/${id}`, { method: "DELETE" }),
-  bookings: () => request<{ bookings: Booking[] }>("/api/admin/bookings"),
-  updateBooking: (id: string, body: { status: string }) =>
+  bookings: () =>
+    request<{ bookings: Booking[]; stats: BookingStats }>("/api/admin/bookings"),
+  updateBooking: (id: string, body: { status?: string; payment_status?: string }) =>
     request<{ booking: Booking }>(`/api/admin/bookings/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
+
   deleteBooking: (id: string) =>
     request<{ ok: true }>(`/api/admin/bookings/${id}`, { method: "DELETE" }),
 };
