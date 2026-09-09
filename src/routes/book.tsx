@@ -47,9 +47,12 @@ export const Route = createFileRoute("/book")({
   component: Book,
 });
 
+type CartLine = { service_id: string; quantity: number };
+
 type BookingData = {
   categoryId: string;
   serviceId: string;
+  items: CartLine[];
   date: string;
   time: string;
   name: string;
@@ -61,6 +64,7 @@ type BookingData = {
 const initialData: BookingData = {
   categoryId: "",
   serviceId: "",
+  items: [],
   date: "",
   time: "",
   name: "",
@@ -128,6 +132,64 @@ function Book() {
   const selectedCategory = categories.find((c) => c.id === data.categoryId);
   const selectedService = allServices.find((s) => s.id === data.serviceId);
 
+  // The booking basket: every service the customer wants in this one visit.
+  const cart = useMemo(
+    () =>
+      data.items
+        .map((line) => {
+          const service = allServices.find((s) => s.id === line.service_id);
+          return service ? { ...line, service } : null;
+        })
+        .filter((l): l is CartLine & { service: (typeof allServices)[number] } => !!l),
+    [data.items, allServices],
+  );
+
+  const cartTotal = useMemo(
+    () => cart.reduce((sum, l) => sum + Number(l.service.price ?? 0) * l.quantity, 0),
+    [cart],
+  );
+
+  const cartDuration = useMemo(
+    () => cart.reduce((sum, l) => sum + Number(l.service.duration_minutes ?? 0) * l.quantity, 0),
+    [cart],
+  );
+
+  const addToCart = (serviceId: string) => {
+    if (!serviceId) return;
+    setData((prev) => {
+      const existing = prev.items.find((i) => i.service_id === serviceId);
+      return {
+        ...prev,
+        serviceId: "",
+        items: existing
+          ? prev.items.map((i) =>
+              i.service_id === serviceId
+                ? { ...i, quantity: Math.min(10, i.quantity + 1) }
+                : i,
+            )
+          : [...prev.items, { service_id: serviceId, quantity: 1 }],
+      };
+    });
+  };
+
+  const setQuantity = (serviceId: string, quantity: number) => {
+    setData((prev) => ({
+      ...prev,
+      items:
+        quantity <= 0
+          ? prev.items.filter((i) => i.service_id !== serviceId)
+          : prev.items.map((i) =>
+              i.service_id === serviceId ? { ...i, quantity: Math.min(10, quantity) } : i,
+            ),
+    }));
+  };
+
+  const removeFromCart = (serviceId: string) =>
+    setData((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => i.service_id !== serviceId),
+    }));
+
   const update = <K extends keyof BookingData>(key: K, value: BookingData[K]) => {
     setData((prev) => ({ ...prev, [key]: value }));
   };
@@ -135,13 +197,13 @@ function Book() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return !!data.categoryId && !!data.serviceId;
+        return data.items.length > 0;
       case 2:
         return !!data.date && !!data.time;
       case 3:
         return !!data.name && /^\S+@\S+\.\S+$/.test(data.email);
       case 4:
-        return !!data.serviceId && !!data.date && !!data.time;
+        return data.items.length > 0 && !!data.date && !!data.time;
       default:
         return true;
     }
@@ -155,7 +217,7 @@ function Book() {
         // Nothing is confirmed here: the booking is stored as pending/unpaid and
         // Stripe hosts the payment. Confirmation happens after Stripe verifies it.
         const res = await bookingPublicApi.startCheckout({
-          service_id: data.serviceId,
+          items: data.items,
           full_name: data.name,
           email: data.email,
           phone: data.phone,
@@ -194,16 +256,16 @@ function Book() {
   // Live from the database: which slots on the chosen day are taken, and which
   // days in the visible month have nothing left at all.
   const { data: dayAvailability, isFetching: loadingSlots } = useQuery({
-    queryKey: ["booking", "availability", "day", data.date, data.serviceId],
-    queryFn: () => bookingPublicApi.dayAvailability(data.date, data.serviceId || undefined),
+    queryKey: ["booking", "availability", "day", data.date, cartDuration],
+    queryFn: () => bookingPublicApi.dayAvailability(data.date, undefined, cartDuration),
     enabled: !!data.date,
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
 
   const { data: monthAvailability } = useQuery({
-    queryKey: ["booking", "availability", "month", monthKey, data.serviceId],
-    queryFn: () => bookingPublicApi.monthAvailability(monthKey, data.serviceId || undefined),
+    queryKey: ["booking", "availability", "month", monthKey, cartDuration],
+    queryFn: () => bookingPublicApi.monthAvailability(monthKey, undefined, cartDuration),
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
