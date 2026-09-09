@@ -452,13 +452,19 @@ export const bookingPublicApi = {
   byReference: (reference: string) =>
     request<{ booking: PublicBooking }>(`/api/bookings/${reference}`),
   dayAvailability: (date: string, serviceId?: string) =>
-    request<{ date: string; unavailable: string[]; slots: string[] }>(
+    request<{
+      date: string;
+      unavailable: string[];
+      slots: string[];
+      closed: boolean;
+      closed_weekdays: number[];
+    }>(
       `/api/availability?date=${encodeURIComponent(date)}${
         serviceId ? `&service_id=${encodeURIComponent(serviceId)}` : ""
       }`,
     ),
   monthAvailability: (month: string, serviceId?: string) =>
-    request<{ month: string; fully_booked: string[] }>(
+    request<{ month: string; fully_booked: string[]; closed_weekdays: number[] }>(
       `/api/availability?month=${encodeURIComponent(month)}${
         serviceId ? `&service_id=${encodeURIComponent(serviceId)}` : ""
       }`,
