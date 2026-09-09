@@ -238,6 +238,14 @@ function Book() {
     return false;
   };
 
+  // Drop a date that sits on a day the salon has switched off.
+  useEffect(() => {
+    if (data.date && closedDays.includes(new Date(`${data.date}T00:00:00`).getDay())) {
+      update("date", "");
+      update("time", "");
+    }
+  }, [closedDays, data.date]);
+
   // If the chosen time gets booked by someone else, drop it.
   useEffect(() => {
     if (data.time && takenSlots.has(data.time)) {
