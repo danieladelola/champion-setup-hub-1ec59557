@@ -29,9 +29,12 @@ export const Route = createFileRoute("/api/availability")({
         const date = url.searchParams.get("date");
         const month = url.searchParams.get("month");
         const serviceId = url.searchParams.get("service_id");
+        // Several services in one booking take the combined time.
+        const requestedDuration = Number(url.searchParams.get("duration") ?? 0);
 
         try {
-          const duration = await serviceDuration(serviceId);
+          const duration =
+            requestedDuration > 0 ? requestedDuration : await serviceDuration(serviceId);
 
           if (date) {
             if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
