@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { Eye, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { AdminShell } from "@/components/admin/admin-shell";
@@ -10,8 +10,8 @@ import { bookingApi, type Booking } from "@/lib/admin-api";
 const title = "Bookings — Mayor Beauty Place Admin";
 const description = "Manage salon appointments, payments and schedules.";
 
-const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
-const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"];
+const STATUSES = ["pending", "confirmed", "in_progress", "completed", "cancelled"];
+const PAYMENT_STATUSES = ["unpaid", "paid", "failed", "refunded"];
 
 type FilterKey = "all" | "pending_payment" | "uncompleted" | "completed" | "cancelled";
 
@@ -69,6 +69,7 @@ export const Route = createFileRoute("/admin/bookings")({
 function Page() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "bookings"],
@@ -128,6 +129,7 @@ function Page() {
   }, [bookings, stats]);
 
   const visible = bookings.filter((b) => matches(b, filter));
+  const openBooking = bookings.find((b) => b.id === openId) ?? null;
 
   return (
     <AdminShell title="Bookings" description={description}>
@@ -212,8 +214,12 @@ function Page() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {b.service}
-                      <div className="text-xs text-muted-foreground">{b.category_name}</div>
+                      {b.items && b.items.length > 0 ? b.items[0]!.service_name : b.service}
+                      <div className="text-xs text-muted-foreground">
+                        {b.items && b.items.length > 1
+                          ? `+ ${b.items.length - 1} more service${b.items.length > 2 ? "s" : ""}`
+                          : b.category_name}
+                      </div>
                     </td>
                     <td className="px-4 py-3">£{Number(b.price ?? 0).toFixed(2)}</td>
                     <td className="px-4 py-3">
@@ -255,7 +261,15 @@ function Page() {
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {formatDateTime(b.created_at)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(b.id)}
+                        className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-brand-blue"
+                        aria-label="View booking"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -274,6 +288,121 @@ function Page() {
           </div>
         )}
       </div>
+
+      {openBooking && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="my-8 w-full max-w-2xl rounded-2xl border border-border bg-card p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-display text-2xl">Booking details</h2>
+                <p className="font-mono text-xs text-muted-foreground">
+                  {openBooking.booking_reference ?? openBooking.id}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenId(null)}
+                className="rounded-lg p-2 text-muted-foreground hover:bg-secondary"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <Field label="Customer" value={openBooking.full_name} />
+              <Field label="Email" value={openBooking.email} />
+              <Field label="Phone" value={openBooking.phone ?? "—"} />
+              <Field
+                label="Booking date"
+                value={`${formatDate(openBooking.preferred_date)} ${openBooking.preferred_time ?? ""}`}
+              />
+              <Field label="Booking status" value={openBooking.status.replace("_", " ")} />
+              <Field
+                label="Payment status"
+                value={openBooking.payment_status ?? "unpaid"}
+              />
+              <Field
+                label="Payment method"
+                value={openBooking.payment_method ?? openBooking.payment_provider ?? "—"}
+              />
+              <Field
+                label="Transaction reference"
+                value={openBooking.stripe_payment_intent_id ?? "—"}
+              />
+              <Field label="Created" value={formatDateTime(openBooking.created_at)} />
+              <Field label="Paid at" value={formatDateTime(openBooking.paid_at)} />
+            </div>
+
+            <div className="mt-6 rounded-xl border border-border">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2">Service</th>
+                    <th className="px-4 py-2">Qty</th>
+                    <th className="px-4 py-2">Price</th>
+                    <th className="px-4 py-2 text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(openBooking.items && openBooking.items.length > 0
+                    ? openBooking.items
+                    : [
+                        {
+                          id: openBooking.id,
+                          service_name: openBooking.service ?? "Service",
+                          category_name: openBooking.category_name,
+                          quantity: 1,
+                          unit_price: openBooking.price ?? 0,
+                          line_total: openBooking.price ?? 0,
+                        },
+                      ]
+                  ).map((item) => (
+                    <tr key={item.id} className="border-b border-border/60 last:border-0">
+                      <td className="px-4 py-2">
+                        {item.service_name}
+                        <div className="text-xs text-muted-foreground">
+                          {item.category_name ?? ""}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">{item.quantity}</td>
+                      <td className="px-4 py-2">£{Number(item.unit_price).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">
+                        £{Number(item.line_total).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                <span className="text-sm font-medium">Total amount</span>
+                <span className="font-display text-xl">
+                  £{Number(openBooking.price ?? 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {openBooking.notes && (
+              <p className="mt-4 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+                {openBooking.notes}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </AdminShell>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm capitalize">{value || "—"}</p>
+    </div>
   );
 }
