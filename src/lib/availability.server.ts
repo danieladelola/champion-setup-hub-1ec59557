@@ -1,5 +1,6 @@
 import { getDb } from "./db.server";
 import { getSettingsSafe } from "./settings.server";
+import { closedWeekdays, isOpenOnDate } from "./settings";
 import {
   buildTimeSlots,
   DEFAULT_DURATION_MINUTES,
@@ -46,13 +47,33 @@ export async function getConfiguredSlots(): Promise<string[]> {
   });
 }
 
+/** Weekday indexes (0 = Sunday) the salon is closed on, from admin Settings. */
+export async function getClosedWeekdays(): Promise<number[]> {
+  const settings = await getSettingsSafe();
+  return closedWeekdays(settings.booking.open_days);
+}
+
+/** True when the salon takes bookings on that date's weekday. */
+export async function isOpenDay(date: string) {
+  const settings = await getSettingsSafe();
+  return isOpenOnDate(settings.booking.open_days, date);
+}
+
 export async function getDayAvailability(date: string, durationMinutes?: number) {
-  const [busy, slots] = await Promise.all([getBusyRangesForDate(date), getConfiguredSlots()]);
+  const [busy, slots, settings] = await Promise.all([
+    getBusyRangesForDate(date),
+    getConfiguredSlots(),
+    getSettingsSafe(),
+  ]);
+  const open = isOpenOnDate(settings.booking.open_days, date);
   return {
     date,
     busy,
     slots,
-    unavailable: unavailableSlots(busy, durationMinutes, slots),
+    closed: !open,
+    closed_weekdays: closedWeekdays(settings.booking.open_days),
+    // A closed weekday has nothing bookable at all.
+    unavailable: open ? unavailableSlots(busy, durationMinutes, slots) : slots,
   };
 }
 
@@ -87,6 +108,7 @@ export async function getFullyBookedDates(month: string, durationMinutes?: numbe
 export async function isSlotAvailable(date: string, time: string, durationMinutes?: number) {
   const start = timeToMinutes(time);
   if (start === null) return false;
+  if (!(await isOpenDay(date))) return false;
   const length =
     durationMinutes && durationMinutes > 0 ? durationMinutes : DEFAULT_DURATION_MINUTES;
   const busy = await getBusyRangesForDate(date);

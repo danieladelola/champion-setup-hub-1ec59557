@@ -1,5 +1,5 @@
 import { getDb } from "./db.server";
-import { isSlotAvailable } from "./availability.server";
+import { isOpenDay, isSlotAvailable } from "./availability.server";
 import type { bookingSchema } from "./services.server";
 import type { z } from "zod";
 
@@ -37,6 +37,11 @@ export async function createPendingBooking(input: BookingInput) {
 
   const price = Number(service["price"] ?? 0);
   const duration = Number(service["duration_minutes"] ?? 0);
+
+  // The salon can switch weekdays off in admin Settings.
+  if (!(await isOpenDay(input.preferred_date))) {
+    throw new BookingError("We are closed on that day. Please choose another date.", 400);
+  }
 
   // Guard against two people paying for the same slot (the browser greys taken
   // slots out, but the check has to live here too).

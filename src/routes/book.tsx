@@ -26,6 +26,7 @@ import bookingHeroAsset from "@/assets/booking-hero-lashes.webp";
 import { bookingPublicApi } from "@/lib/admin-api";
 import { AdSlot } from "@/components/ad-slot";
 import { buildTimeSlots } from "@/lib/availability";
+import { closedWeekdays } from "@/lib/settings";
 import { useSettings } from "@/lib/site-settings";
 
 const title = "Book A Service — Mayor Beauty Place";
@@ -212,6 +213,12 @@ function Book() {
     [dayAvailability],
   );
 
+  // Weekdays the salon has switched off in admin Settings.
+  const closedDays = useMemo(
+    () => monthAvailability?.closed_weekdays ?? closedWeekdays(booking.open_days),
+    [monthAvailability, booking.open_days],
+  );
+
   const fullyBookedDates = useMemo(
     () =>
       (monthAvailability?.fully_booked ?? []).map((d) => new Date(`${d}T00:00:00`)),
@@ -230,6 +237,14 @@ function Book() {
     }
     return false;
   };
+
+  // Drop a date that sits on a day the salon has switched off.
+  useEffect(() => {
+    if (data.date && closedDays.includes(new Date(`${data.date}T00:00:00`).getDay())) {
+      update("date", "");
+      update("time", "");
+    }
+  }, [closedDays, data.date]);
 
   // If the chosen time gets booked by someone else, drop it.
   useEffect(() => {
@@ -262,8 +277,8 @@ function Book() {
           className="absolute inset-0 h-full w-full object-cover"
           loading="eager"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/70 to-ink/40" />
-        <div className="relative z-10 mx-auto max-w-6xl">
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/85 via-ink/70 to-ink/85" />
+        <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center text-center">
           <span className="mb-6 inline-flex items-center gap-3 rounded-full border border-on-dark/25 bg-on-dark/10 px-5 py-2 text-xs font-medium tracking-widest text-on-dark/90 uppercase backdrop-blur-sm">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-red" />
             Book A Service
@@ -272,7 +287,7 @@ function Book() {
             Reserve Your
             <em className="italic text-brand-red"> Session</em>
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-relaxed font-light text-on-dark/90">
+          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed font-light text-on-dark/90">
             Follow the steps below to choose your treatment, time, and details.
           </p>
         </div>
@@ -452,6 +467,7 @@ function Book() {
                         disabled={[
                           { before: today },
                           { after: lastBookableDay },
+                          ...(closedDays.length ? [{ dayOfWeek: closedDays }] : []),
                           ...fullyBookedDates,
                         ]}
                         defaultMonth={selectedDate ?? today}

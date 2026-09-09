@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@/lib/auth.server";
 import { getDb } from "@/lib/db.server";
 import { bookingSchema } from "@/lib/services.server";
-import { isSlotAvailable } from "@/lib/availability.server";
+import { isOpenDay, isSlotAvailable } from "@/lib/availability.server";
 
 export const Route = createFileRoute("/api/bookings")({
   server: {
@@ -33,6 +33,13 @@ export const Route = createFileRoute("/api/bookings")({
             limit 1`;
           const service = rows[0];
           if (!service) return json({ error: "Service unavailable" }, { status: 400 });
+
+          if (!(await isOpenDay(b.preferred_date))) {
+            return json(
+              { error: "We are closed on that day. Please choose another date." },
+              { status: 400 },
+            );
+          }
 
           const free = await isSlotAvailable(
             b.preferred_date,

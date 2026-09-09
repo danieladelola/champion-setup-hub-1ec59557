@@ -15,7 +15,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CURRENCIES,
   DEFAULT_SETTINGS,
+  normaliseOpenDays,
   TIMEZONES,
+  WEEKDAYS,
   type SiteSettings,
 } from "@/lib/settings";
 
@@ -603,6 +605,38 @@ function Page() {
                   }
                 />
               </Field>
+              <div className="md:col-span-2">
+                <Field
+                  label="Days we take bookings"
+                  hint="Switch a day off and it cannot be selected on the booking calendar."
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAYS.map((day, i) => {
+                      const days = normaliseOpenDays(form.booking.open_days);
+                      const open = days[i] === true;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            const next = [...days];
+                            next[i] = !open;
+                            set("booking", "open_days", next);
+                          }}
+                          aria-pressed={open}
+                          className={`rounded-full border px-4 py-2 text-xs font-medium transition ${
+                            open
+                              ? "border-brand-blue bg-brand-blue text-white"
+                              : "border-border bg-card text-muted-foreground line-through"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              </div>
               <Field label="Minimum notice (hours)">
                 <Input
                   type="number"

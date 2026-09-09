@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { json } from "@/lib/auth.server";
-import { getDayAvailability, getFullyBookedDates } from "@/lib/availability.server";
-import { TIME_SLOTS } from "@/lib/availability";
+import {
+  getClosedWeekdays,
+  getDayAvailability,
+  getFullyBookedDates,
+} from "@/lib/availability.server";
 import { getDb } from "@/lib/db.server";
 
 async function serviceDuration(serviceId: string | null) {
@@ -35,15 +38,18 @@ export const Route = createFileRoute("/api/availability")({
               return json({ error: "Invalid date" }, { status: 400 });
             }
             const day = await getDayAvailability(date, duration);
-            return json({ ...day, slots: TIME_SLOTS });
+            return json(day);
           }
 
           if (month) {
             if (!/^\d{4}-\d{2}$/.test(month)) {
               return json({ error: "Invalid month" }, { status: 400 });
             }
-            const fullyBooked = await getFullyBookedDates(month, duration);
-            return json({ month, fully_booked: fullyBooked });
+            const [fullyBooked, closed] = await Promise.all([
+              getFullyBookedDates(month, duration),
+              getClosedWeekdays(),
+            ]);
+            return json({ month, fully_booked: fullyBooked, closed_weekdays: closed });
           }
 
           return json({ error: "Provide a date or month" }, { status: 400 });
