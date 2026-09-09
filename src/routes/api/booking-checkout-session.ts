@@ -6,7 +6,7 @@ import {
   BookingError,
   createPendingBooking,
 } from "@/lib/bookings.server";
-import { bookingSchema } from "@/lib/services.server";
+import { multiBookingSchema } from "@/lib/services.server";
 import {
   createBookingCheckoutSession,
   getStripeSecretKey,
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/api/booking-checkout-session")({
           return json({ error: "Invalid request" }, { status: 400 });
         }
 
-        const parsed = bookingSchema.safeParse(body);
+        const parsed = multiBookingSchema.safeParse(body);
         if (!parsed.success) {
           return json(
             { error: parsed.error.issues[0]?.message ?? "Invalid booking details" },
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/booking-checkout-session")({
         try {
           getStripeSecretKey();
 
-          const { booking, price, serviceName } = await createPendingBooking(parsed.data);
+          const { booking, price, items } = await createPendingBooking(parsed.data);
           const reference = booking["booking_reference"] as string;
 
           // Services without an online price are request-only: there is nothing
@@ -47,12 +47,18 @@ export const Route = createFileRoute("/api/booking-checkout-session")({
             );
           }
 
+          // One Stripe session, one line per chosen service.
           const session = await createBookingCheckoutSession({
             bookingId: booking["id"] as string,
             reference,
             email: parsed.data.email,
-            serviceName,
-            price,
+            lines: items
+              .filter((i) => i.unit_price > 0)
+              .map((i) => ({
+                name: i.service_name,
+                unit_price: i.unit_price,
+                quantity: i.quantity,
+              })),
             origin: new URL(request.url).origin,
           });
 

@@ -28,9 +28,46 @@ export const bookingSchema = z.object({
   notes: z.string().trim().max(1000).optional().nullable(),
 });
 
+export const bookingItemSchema = z.object({
+  service_id: z.string().uuid("Select a service"),
+  quantity: z.coerce.number().int().min(1).max(10).default(1),
+});
+
+/**
+ * One booking can hold several services paid for together. A single
+ * `service_id` is still accepted so older clients keep working.
+ */
+export const multiBookingSchema = bookingSchema
+  .omit({ service_id: true })
+  .extend({
+    service_id: z.string().uuid().optional(),
+    items: z.array(bookingItemSchema).min(1).max(20).optional(),
+  })
+  .transform((value) => {
+    const items =
+      value.items && value.items.length > 0
+        ? value.items
+        : value.service_id
+          ? [{ service_id: value.service_id, quantity: 1 }]
+          : [];
+    return { ...value, items };
+  })
+  .refine((value) => value.items.length > 0, {
+    message: "Select at least one service",
+    path: ["items"],
+  });
+
 export const BOOKING_STATUSES = [
   "pending",
   "confirmed",
+  "in_progress",
   "completed",
   "cancelled",
+] as const;
+
+export const BOOKING_PAYMENT_STATUSES = [
+  "unpaid",
+  "paid",
+  "failed",
+  "refunded",
 ] as const;

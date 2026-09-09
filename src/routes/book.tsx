@@ -9,6 +9,9 @@ import {
   User,
   Sparkles,
   Loader2,
+  Plus,
+  Minus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,9 +50,12 @@ export const Route = createFileRoute("/book")({
   component: Book,
 });
 
+type CartLine = { service_id: string; quantity: number };
+
 type BookingData = {
   categoryId: string;
   serviceId: string;
+  items: CartLine[];
   date: string;
   time: string;
   name: string;
@@ -61,6 +67,7 @@ type BookingData = {
 const initialData: BookingData = {
   categoryId: "",
   serviceId: "",
+  items: [],
   date: "",
   time: "",
   name: "",
@@ -128,6 +135,64 @@ function Book() {
   const selectedCategory = categories.find((c) => c.id === data.categoryId);
   const selectedService = allServices.find((s) => s.id === data.serviceId);
 
+  // The booking basket: every service the customer wants in this one visit.
+  const cart = useMemo(
+    () =>
+      data.items
+        .map((line) => {
+          const service = allServices.find((s) => s.id === line.service_id);
+          return service ? { ...line, service } : null;
+        })
+        .filter((l): l is CartLine & { service: (typeof allServices)[number] } => !!l),
+    [data.items, allServices],
+  );
+
+  const cartTotal = useMemo(
+    () => cart.reduce((sum, l) => sum + Number(l.service.price ?? 0) * l.quantity, 0),
+    [cart],
+  );
+
+  const cartDuration = useMemo(
+    () => cart.reduce((sum, l) => sum + Number(l.service.duration_minutes ?? 0) * l.quantity, 0),
+    [cart],
+  );
+
+  const addToCart = (serviceId: string) => {
+    if (!serviceId) return;
+    setData((prev) => {
+      const existing = prev.items.find((i) => i.service_id === serviceId);
+      return {
+        ...prev,
+        serviceId: "",
+        items: existing
+          ? prev.items.map((i) =>
+              i.service_id === serviceId
+                ? { ...i, quantity: Math.min(10, i.quantity + 1) }
+                : i,
+            )
+          : [...prev.items, { service_id: serviceId, quantity: 1 }],
+      };
+    });
+  };
+
+  const setQuantity = (serviceId: string, quantity: number) => {
+    setData((prev) => ({
+      ...prev,
+      items:
+        quantity <= 0
+          ? prev.items.filter((i) => i.service_id !== serviceId)
+          : prev.items.map((i) =>
+              i.service_id === serviceId ? { ...i, quantity: Math.min(10, quantity) } : i,
+            ),
+    }));
+  };
+
+  const removeFromCart = (serviceId: string) =>
+    setData((prev) => ({
+      ...prev,
+      items: prev.items.filter((i) => i.service_id !== serviceId),
+    }));
+
   const update = <K extends keyof BookingData>(key: K, value: BookingData[K]) => {
     setData((prev) => ({ ...prev, [key]: value }));
   };
@@ -135,13 +200,13 @@ function Book() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return !!data.categoryId && !!data.serviceId;
+        return data.items.length > 0;
       case 2:
         return !!data.date && !!data.time;
       case 3:
         return !!data.name && /^\S+@\S+\.\S+$/.test(data.email);
       case 4:
-        return !!data.serviceId && !!data.date && !!data.time;
+        return data.items.length > 0 && !!data.date && !!data.time;
       default:
         return true;
     }
@@ -155,7 +220,7 @@ function Book() {
         // Nothing is confirmed here: the booking is stored as pending/unpaid and
         // Stripe hosts the payment. Confirmation happens after Stripe verifies it.
         const res = await bookingPublicApi.startCheckout({
-          service_id: data.serviceId,
+          items: data.items,
           full_name: data.name,
           email: data.email,
           phone: data.phone,
@@ -194,16 +259,16 @@ function Book() {
   // Live from the database: which slots on the chosen day are taken, and which
   // days in the visible month have nothing left at all.
   const { data: dayAvailability, isFetching: loadingSlots } = useQuery({
-    queryKey: ["booking", "availability", "day", data.date, data.serviceId],
-    queryFn: () => bookingPublicApi.dayAvailability(data.date, data.serviceId || undefined),
+    queryKey: ["booking", "availability", "day", data.date, cartDuration],
+    queryFn: () => bookingPublicApi.dayAvailability(data.date, undefined, cartDuration),
     enabled: !!data.date,
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
 
   const { data: monthAvailability } = useQuery({
-    queryKey: ["booking", "availability", "month", monthKey, data.serviceId],
-    queryFn: () => bookingPublicApi.monthAvailability(monthKey, data.serviceId || undefined),
+    queryKey: ["booking", "availability", "month", monthKey, cartDuration],
+    queryFn: () => bookingPublicApi.monthAvailability(monthKey, undefined, cartDuration),
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
@@ -439,8 +504,84 @@ function Book() {
                         {selectedService.description}
                       </p>
                     )}
+                    <Button
+                      type="button"
+                      onClick={() => addToCart(selectedService.id)}
+                      className="mt-5 rounded-full bg-brand-blue px-6 py-5 text-xs font-semibold text-on-brand hover:bg-brand-red"
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> Add to booking
+                    </Button>
                   </div>
                 )}
+
+                <div className="mt-8 rounded-2xl border border-border bg-card p-5">
+                  <h3 className="font-display text-xl">Your booking</h3>
+                  {cart.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Nothing added yet. Choose a category and service above, then tap
+                      “Add to booking”. You can add as many services as you like and pay
+                      for them all together.
+                    </p>
+                  ) : (
+                    <>
+                      <ul className="mt-4 space-y-3">
+                        {cart.map((line) => (
+                          <li
+                            key={line.service_id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3"
+                          >
+                            <div className="min-w-[140px]">
+                              <div className="font-medium">{line.service.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatPrice(line.service.price)} • {line.service.duration_minutes} min
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                aria-label={`Reduce ${line.service.name}`}
+                                onClick={() => setQuantity(line.service_id, line.quantity - 1)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
+                              >
+                                <Minus className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="w-6 text-center text-sm font-semibold">
+                                {line.quantity}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`Add another ${line.service.name}`}
+                                onClick={() => setQuantity(line.service_id, line.quantity + 1)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-border hover:bg-secondary"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="ml-3 w-20 text-right font-medium">
+                                {formatPrice(Number(line.service.price) * line.quantity)}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${line.service.name}`}
+                                onClick={() => removeFromCart(line.service_id)}
+                                className="ml-1 text-muted-foreground hover:text-brand-red"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+                        <span className="text-sm text-muted-foreground">
+                          Total • about {cartDuration} min
+                        </span>
+                        <span className="font-display text-2xl text-brand-red">
+                          {formatPrice(cartTotal)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
@@ -599,24 +740,36 @@ function Book() {
                   Review your booking, then pay securely with Stripe.
                 </p>
                 <div className="mb-8 rounded-2xl border border-border bg-secondary/50 p-6">
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Category</span>
-                    <span className="font-medium">{selectedCategory?.name}</span>
-                  </div>
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Service</span>
-                    <span className="font-medium">{selectedService?.name}</span>
-                  </div>
-                  <div className="mb-4 flex items-center justify-between">
+                  <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">
+                    Services
+                  </p>
+                  <ul className="mb-4 space-y-2">
+                    {cart.map((line) => (
+                      <li key={line.service_id} className="flex items-center justify-between gap-4">
+                        <span className="text-sm">
+                          {line.service.name}
+                          {line.quantity > 1 ? ` × ${line.quantity}` : ""}
+                        </span>
+                        <span className="font-medium">
+                          {formatPrice(Number(line.service.price) * line.quantity)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mb-4 flex items-center justify-between border-t border-border pt-4">
                     <span className="text-sm text-muted-foreground">Date & time</span>
                     <span className="font-medium">
                       {data.date} at {data.time}
                     </span>
                   </div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Total time</span>
+                    <span className="font-medium">about {cartDuration} min</span>
+                  </div>
                   <div className="flex items-center justify-between border-t border-border pt-4">
-                    <span className="font-medium">Total</span>
+                    <span className="font-medium">Total to pay</span>
                     <span className="font-display text-2xl text-brand-red">
-                      {formatPrice(selectedService?.price ?? 0)}
+                      {formatPrice(cartTotal)}
                     </span>
                   </div>
                 </div>
@@ -651,15 +804,25 @@ function Book() {
                 </h2>
                 <p className="mb-8 max-w-md text-muted-foreground">
                   Thank you, {data.name || "guest"}. We have received your request for{" "}
-                  {selectedService?.name} on {data.date} at {data.time}. Our team will
-                  confirm within 24 hours.
+                  {cart.length} service{cart.length === 1 ? "" : "s"} on {data.date} at{" "}
+                  {data.time}. Our team will confirm within 24 hours.
                 </p>
                 <div className="w-full max-w-md rounded-2xl border border-border bg-secondary/50 p-6 text-left">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Service</span>
-                    <span className="font-medium">{selectedService?.name}</span>
-                  </div>
-                  <div className="mb-3 flex items-center justify-between">
+                  {cart.map((line) => (
+                    <div
+                      key={line.service_id}
+                      className="mb-3 flex items-center justify-between gap-4"
+                    >
+                      <span className="text-sm text-muted-foreground">
+                        {line.service.name}
+                        {line.quantity > 1 ? ` × ${line.quantity}` : ""}
+                      </span>
+                      <span className="font-medium">
+                        {formatPrice(Number(line.service.price) * line.quantity)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="mb-3 flex items-center justify-between border-t border-border pt-3">
                     <span className="text-sm text-muted-foreground">Date</span>
                     <span className="font-medium">{data.date}</span>
                   </div>
@@ -670,7 +833,7 @@ function Book() {
                   <div className="flex items-center justify-between border-t border-border pt-4">
                     <span className="font-medium">Total</span>
                     <span className="font-display text-2xl text-brand-red">
-                      {formatPrice(selectedService?.price ?? 0)}
+                      {formatPrice(cartTotal)}
                     </span>
                   </div>
                 </div>
