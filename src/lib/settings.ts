@@ -153,6 +153,11 @@ export const settingsSchema = z.object({
       slot_interval_minutes: z.coerce.number().int().min(5).max(120).default(10),
       min_notice_hours: z.coerce.number().int().min(0).max(720).default(0),
       max_advance_days: z.coerce.number().int().min(1).max(730).default(180),
+      // One flag per weekday, index 0 = Sunday … 6 = Saturday (matches Date.getDay()).
+      open_days: z
+        .array(z.boolean())
+        .length(7)
+        .default([false, true, true, true, true, true, true]),
       require_payment: z.boolean().default(false),
       note: text(400).default(""),
     })
@@ -200,6 +205,39 @@ export const settingsSchema = z.object({
 });
 
 export type SiteSettings = z.infer<typeof settingsSchema>;
+
+/** Weekday labels, index-aligned with `booking.open_days` (0 = Sunday). */
+export const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+export const DEFAULT_OPEN_DAYS = [false, true, true, true, true, true, true];
+
+export function normaliseOpenDays(days: unknown): boolean[] {
+  return Array.isArray(days) && days.length === 7
+    ? days.map((d) => d !== false)
+    : [...DEFAULT_OPEN_DAYS];
+}
+
+/** Weekday indexes the salon is closed on. */
+export function closedWeekdays(days: unknown): number[] {
+  return normaliseOpenDays(days)
+    .map((open, i) => (open ? -1 : i))
+    .filter((i) => i >= 0);
+}
+
+/** True when a YYYY-MM-DD date falls on an open weekday. */
+export function isOpenOnDate(days: unknown, date: string) {
+  const d = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return false;
+  return normaliseOpenDays(days)[d.getDay()] === true;
+}
 
 /** Fully-populated defaults, used before anything has been saved. */
 export const DEFAULT_SETTINGS: SiteSettings = settingsSchema.parse({});
